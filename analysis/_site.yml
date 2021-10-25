@@ -1,7 +1,7 @@
-name: "classical_analysis_GxE"
+name: classical_analysis_GxE
 output_dir: ../docs
 navbar:
-  title: "classical_analysis_GxE"
+  title: classical_analysis_GxE
   left:
   - text: Home
     href: index.html
@@ -9,6 +9,10 @@ navbar:
     href: about.html
   - text: License
     href: license.html
+  right:
+  - icon: fa-github
+    text: Source code
+    href: https://github.com/mab658/research_project
 output:
   workflowr::wflow_html:
     toc: yes
