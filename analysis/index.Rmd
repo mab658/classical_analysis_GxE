@@ -1,5 +1,8 @@
 ---
-title: "Home"
+title: "Classical statistical analysis of multi-environment data"
+author: 
+  - name: "Moshood Agba Bakare"
+    affiliation: "JeanLuc's lab Cornell University"
 site: workflowr::wflow_site
 output:
   workflowr::wflow_html:
@@ -9,3 +12,14 @@ editor_options:
 ---
 
 Welcome to my research website.
+
+## Project overview
+The purpose of this project is to gain some insights in using classical statistical methods in the analysis of multi-environment data. The principal objectives are outlined as follow:
+
+1. To identify stable and high-yielding cassava clones adapted to broad and/or specific environments
+
+2. To determine the relative importance of sources of variation influencing key agronomic traits; and
+
+3. To identify mega environments for Nigerian cassava
+
+4. Finally, we sought to provide a clear road map for other researchers in pursuing these objectives
