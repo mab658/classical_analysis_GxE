@@ -1,0 +1,487 @@
+---
+title: "Classical Statistical Approach to GxE analysis"
+author: 
+  - name: "Moshood Agba Bakare"
+    affiliation: "JeanLuc's Lab Cornell University"
+date: "`r Sys.Date()`"
+header-includes:
+  - \usepackage{amsmath}
+output:
+  bookdown::html_document2:
+    fig_caption: true
+    number_sections: true
+    df_print: paged
+    mathjax: "default"
+    highlight: kate
+    toc: true
+    toc_depth: 3
+    #css: "my_style.css"
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+---
+
+```{r setup, include=FALSE}
+# Configuring global parameters
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, error=FALSE, warning = FALSE,
+                      fig.align = "center", fig.height = 6, fig.width = 6,
+                      class.source = "lineAnchors")
+```
+
+
+```{r, include=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+#=======================================================================
+# Packages
+#=======================================================================
+if (!require("pacman")) {
+  install.packages("pacman")
+}
+# Include all packages here
+pacman::p_load(
+  plyr,
+  ggplot2,
+  ggrepel,
+  factoextra,
+  dplyr,
+  tidyverse,
+  tidyr,
+  tibble,
+  statgenGxE,
+  asreml,
+  RColorBrewer,
+  kableExtra, 
+  prettycode,
+  formattable
+)
+prettycode::prettycode() 
+```
+
+
+# Read combined GxE data in csv format into R 
+The combined GxE data is imported into R and tranposed from wide to narrow format for easy visualization of key variables of interest.
+
+```{r,import}
+# Import the combined raw data in wide format
+phenoDat <- read.csv(file="data/combined_trial.csv", header=TRUE)
+
+
+# Subset key variable and transpose the imported data in wide format to a narrow format
+narrowPhenoDat <- phenoDat %>%
+  dplyr::select(loc, year, env, trial, rep, gen,prop_hav, fyld, dyld, hi, tyld, dm) %>%
+  gather(key = trait, value = y, -c(loc, year, env, trial, rep, gen, prop_hav))
+
+# write the narrow format combined GxE data file to a working directory data
+write.csv(narrowPhenoDat,file="output/narrowPhenoDat.csv", row.names=FALSE)
+
+# coerce variable to factors
+narrowPhenoDat$trial <- as.factor(narrowPhenoDat$trial)
+narrowPhenoDat$loc <- as.factor(narrowPhenoDat$loc)
+narrowPhenoDat$year <- as.factor(narrowPhenoDat$year)
+narrowPhenoDat$env <- as.factor(narrowPhenoDat$env)
+narrowPhenoDat$trait <- as.factor(narrowPhenoDat$trait)
+
+narrowPhenoDat$year <- factor(narrowPhenoDat$year, levels = c("2018", "2019", "2020"), labels = c("2017-2018", "2018-2019", "2019-2020"))
+
+```
+
+
+# Data visualization
+This is a boxplot showing the distribution of key traits of interest across environments i.e. location and year combination
+
+```{r,boxplot_env_trait}
+boxplot_env_trait <- ggplot(data = narrowPhenoDat , aes(x=loc,y=y, fill=trait)) +
+    geom_boxplot( stat = "boxplot",  outlier.colour = "red", outlier.shape = 16, outlier.size = 0.5, na.rm=TRUE) +
+  stat_summary(fun=mean, colour="blue", geom="point", na.rm = TRUE) + 
+  labs(x= "Location", y= "Response values") + theme_bw() +
+  theme(axis.title = element_text(colour="black",face="bold", size=12),
+         plot.title = element_text(hjust = 0.5,lineheight=.5,colour="black",face="bold", size=12),
+         axis.text = element_text(face="bold", size=7), axis.text.x = element_text(angle = 90, hjust = 1),legend.position="none")+
+    facet_grid(trait~year, scales = "free")
+
+# save the plot to a file
+#ggsave("boxplot_env_trait.jpeg",height=5, width=8, units="in", dpi=300)
+print(boxplot_env_trait)
+
+```
+
+
+# A diagnostic plot I
+This is a diagnostics plot of CV vs broad-sense heritability of each trial. The input file to generate this plot is a summary statistics of raw data resulting from using SAS application.
+
+```{r, CV_vs_H2, results='hide'}
+# read summary statistics output file
+stats.output <- read.csv(file="output/raw_pheno_trial_summary.csv", header=T)
+
+# filter the trait of interest from the summary output file
+stats.output <- subset(stats.output, trait=="fyld") # subset for fresh root yield trait
+
+cv_vs_H2 <- ggplot(data = stats.output,
+       aes(x = H2,
+           y = cv)) + 
+  geom_point(color = ifelse(stats.output$cv > 40.5 | stats.output$H2 < 0.05, "#E41A1C", "#4DAF4A"),size = 1.7,
+             alpha = 0.5) +
+  scale_color_brewer(palette = "Set1") +
+  geom_text_repel(aes(x = H2,
+                      y = cv,
+                      label = trial),
+                  size = 2.5, segment.colour = NA) +
+  labs(x = "Heritability",
+       y = "CV (%)") +
+ theme_bw() +
+   scale_x_continuous(breaks = seq(from = 0.0, to = 0.70, by = 0.1))
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(size = 7, hjust = 0.5),
+        axis.text.y = element_text(size = 7, hjust = 0.5, angle = 90),
+       axis.title.y = element_text(size = 10, face = "bold"),
+       axis.title.x = element_text(size = 10, face = "bold"),
+       legend.background = element_rect(fill = "NA", color = "black", size = 0.5),
+       legend.text = element_text(size = 7),
+       legend.title = element_text(size = 10, face = "bold"),
+       legend.position = "right"
+ )
+
+# save the plot to a file
+#ggsave("cv_vs_H2.jpeg",height=5, width=8, units="in", dpi=300)
+
+# Print the heatmap
+print(cv_vs_H2)
+```
+
+
+# A diagnostic plot II
+This is a  diagnostics plot of experimental accuracy vs broad-sense heritability of the trials. The input file to generate this plot is a summary statistics of raw data resulting from using SAS application.
+
+```{r,Ac_vs_H2}
+
+# filter the trait of interest from the summary output file
+Ac_H2_output <- subset(stats.output, trait=="fyld", select= c("trial","trait","H2","Accr"))
+
+Ac_vs_H2 <- ggplot(data = Ac_H2_output,
+       aes(x = H2,
+           y = Accr)) +
+  geom_point(color = ifelse(Ac_H2_output$Accr < 0.40 | Ac_H2_output$H2 < 0.05, "red", "green"),size = 1.7,
+             alpha = 0.5) +
+  scale_color_brewer(palette = "Set1") +
+  geom_text_repel(aes(x = H2,
+                      y = Accr,
+                      label = trial),
+                  size = 2.5, segment.colour = NA) +
+  labs(x = "Heritability",
+       y = "Experimental accuracy") +
+ theme_light() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(size = 7, hjust = 0.5),
+        axis.text.y = element_text(size = 7, hjust = 0.5, angle = 90),
+       axis.title.y = element_text(size = 10, face = "bold"),
+       axis.title.x = element_text(size = 10, face = "bold"),
+       legend.background = element_rect(fill = "NA", color = "black", size = 0.5),
+       legend.text = element_text(size = 7),
+       legend.title = element_text(size = 10, face = "bold"),
+       legend.position = "right"
+ )
+
+
+# output the plot to a file
+#ggsave("Ac_vs_H2.jpeg",height=5, width=8, units="in", dpi=300)
+
+print(Ac_vs_H2) # output the plot
+```
+
+
+# Fitting Finlay Wilkinson (FW) model
+
+This chunk called a defined function fwModel to fit FW model for a trait of interest.The script reads two-way GxE adjusted means output from  fitting linear mixed  using SAS application.
+
+From this point, the analysis was based on 17 trials after data quality control where 3 trials are excluded as shown in red data point in diagnostic plots.
+
+Note: The function can be invoked to fit FW model for any trait of interest within the input data file.
+
+```{r, fwModel}
+# import the two-way GxE table ouput resulting from using SAS application
+two_wayGxE <- read.csv(file="output/gen_env_trait.csv", header=T)
+
+## Create a trial data TD object
+setATD <- statgenSTA::createTD(data = two_wayGxE, genotype = "gen", trial = "env")
+
+# Invoke a defined funtion fwMpdel from source script to fit FW model
+source("code/fwModel.R")
+
+# Example: Invoke the defined function to fit FW model for fresh root yield (fyld)
+fwOutput <- fwModel(traitName = "fyld")
+print(fwOutput)
+```
+
+
+# Fitting Additive Main Effect and Multiplicative (AMMI) Model
+A defined function ammiModel was invoked to fit AMMI model on fresh root yield. The script reads two-way GxE adjusted means output from  fitting linear mixed  using SAS application.
+
+Like FW model, the analysis was based on 17 trials after data quality control where 3 trials are excluded as shown in red data point in diagnostic plots.
+
+
+```{r, ammiModel}
+
+# Invoke a defined funtion ammiModel from source script to fit AMMI model
+source("code/ammiModel.R")
+
+# Example: Invoke the defined function to fit AMMI model for fresh root yield (fyld)
+AMMIoutput <- ammiModel(traitName = "fyld")
+print(AMMIoutput)
+```
+
+
+
+# Fit genotype and genotype by environment interaction (GGE) model
+A defined function ggeModel was invoked to fit GGE model on fresh root yield. The script reads two-way GxE adjusted means output from fitting linear mixed  using SAS application.
+
+Like other two models, the analysis was based on 17 trials after data quality control where 3 trials are excluded as shown in red data point in diagnostic plots.
+
+```{r, ggeModel}
+
+# Invoke a defined funtion ggeModel from source script to fit GGE model
+source("code/ggeModel.R")
+
+# Example: Invoke the defined function to fit AMMI model for fresh root yield (fyld)
+GGEoutput <- ggeModel(traitName = "fyld")
+print(GGEoutput)
+```
+
+
+# Representative of target population of environment(TPE) for fresh yield
+
+This script chunk is determing the number of environments that is likely to represent target population of environment (TPE). This has to be run separately for fyld, dm, and tyld. The output from these 3 traits are merged together to have a plot in the next chunk.
+
+Note: This script chunk for TPE was adapated from Gemenet Dorcus Chepkesis of 
+excellent in breeding (EiB).
+
+```{r repTPE, eval=FALSE, echo=FALSE}
+pheno <- phenoDat %>% dplyr::select(loc, year, env,trial,
+                                    gen,rep,prop_hav,fyld, dm,tyld) %>% 
+  dplyr::filter(!trial %in% c("18UYT36setAKN", "19UYT36setAZA", "19UYT36setAMK")) %>% data.frame
+           
+pheno$rep  <- as.factor(pheno$rep)
+pheno$loc  <- as.factor(pheno$loc)
+pheno$year <- as.factor(pheno$year)
+pheno$env  <- as.factor(pheno$env)
+pheno$gen  <- as.factor(pheno$gen)
+
+# Combined analysis model fresh root yield
+modfit  <-  asreml(fixed=fyld~env + prop_hav,
+        random= ~ at(env):rep + gen + gen:env,
+	residual=~dsum(~units|env),
+        na.action=na.method(y='include',x='include'),
+        data=pheno,maxit=30,workspace = 250e6, pworkspace=250e6,trace = FALSE)
+
+
+#summary(modfit)$varcomp
+
+preds <- predict(modfit, classify = "gen")$pvals
+
+BLUPlist_All <- preds %>% select(gen,predicted.value) %>%
+rename(AllEnvBlup=predicted.value) %>% data.frame
+
+#cat("\n BLUPs across all environments","\n")  
+#print(BLUPlist_All)
+
+ 
+# dataframe to store the result
+BlupOutput <- expand.grid(gen = levels(pheno$gen))
+heritabOutput <- expand.grid(env = levels(pheno$env))
+heritabOutput$H2_Cullis <- NA
+heritabOutput$Corr <- NA
+
+# Fit environment-specific model - random genetic effect
+
+for (i in 1:length(levels(pheno$env))){ # loop each trial
+  
+  	subdat <- subset(pheno,env==unique(levels(pheno$env))[i])
+  	modfit <- asreml(fixed = fyld~rep + prop_hav,
+			random = ~ gen,
+			residual=~id(units),
+			na.action=na.method(y='include',x='include'),
+			data  = subdat,trace=FALSE)
+
+	# extract out the predicted value from each trial and correlate with all env blups
+	PredVal <- predict(modfit, classify = "gen")$pvals
+	envPredVal <- PredVal %>% select(gen,predicted.value) %>%
+	rename(envBlup=predicted.value) %>% data.frame
+	mergePredVal  <- merge(BLUPlist_All, envPredVal, by="gen",all=TRUE)
+	heritabOutput$Corr[i] <- with(mergePredVal, cor(AllEnvBlup,envBlup, use="complete.obs"))
+	
+	colnames(envPredVal)[2] <- levels(pheno$env)[i]
+	
+	# extract the blups for each environment
+	BlupOutput <- merge(BlupOutput, envPredVal, by="gen",all=TRUE)
+ 
+	vc.g <- summary(modfit)$varcomp['gen','component']
+	# Mean variance of a difference of two genotypic BLUPs
+      	vdBLUP.mat <- predict(modfit, classify="gen", only="gen", sed=TRUE)$sed^2 # obtain squared s.e.d. matrix
+      	vdBLUP.avg <- mean(vdBLUP.mat[upper.tri(vdBLUP.mat, diag=FALSE)]) # take mean of upper triangle
+      	heritabOutput$H2_Cullis[i] <- 1 - (vdBLUP.avg/(vc.g*2)) # H2 Cullis 
+}
+
+# rank the correlation and H2_cullis in descending order and sum the ranks
+heritabOutput$rank_r <- rank(-heritabOutput$Corr)
+heritabOutput$rank_H2 <- rank(-heritabOutput$H2_Cullis)
+heritabOutput$sum_rank <- heritabOutput$rank_r + heritabOutput$rank_H2
+heritabOutput <- heritabOutput[order(heritabOutput$sum_rank),]
+
+cat("\n correlation and Cullis heritability estimate by  environments","\n")
+print(heritabOutput)
+write.csv(heritabOutput, file="output/fyld_H2_and_corr_per_env.csv", row.names=FALSE)
+
+#cat("\n Blups estimate from individual environment","\n")
+#print(BlupOutput)
+  
+# write the environment specific blups to csv file format
+#write.csv(BlupOutput, file="output/fyld_env_specific_blup.csv")
+
+
+#Plotting the number of representative environments
+allEnvs <- unique(pheno$env)
+nEnvs <- length(allEnvs)
+
+## Cross validation
+iters=50
+ddList <- list()
+for(u in 1:(nEnvs-1)){
+   print(paste("nEnvs=",u))
+  cors0 <- numeric()
+  set.seed(1245)
+   for(k in 1:iters){
+     provENVS <- sample(allEnvs,u)
+     provdat <- pheno[which(pheno$env %in% provENVS),]
+
+     if(u==1){
+	modfit  <- try(asreml(fixed=fyld~ prop_hav,
+        random= ~ gen + at(env):rep,
+        residual=~dsum(~units|env),
+        na.action=na.method(y='include',x='include'),
+        data=provdat,maxit=30,workspace = 250e6, pworkspace=250e6,trace=FALSE))
+
+
+	if (!inherits(modfit, what = "try-error")){
+		# extract out the predicted value from each trial and correlate with all env blups
+        	PredVal <- predict(modfit, classify = "gen")$pvals
+        	envPredVal <- PredVal %>% select(gen,predicted.value) %>%
+        	rename(envBlup=predicted.value) %>% data.frame
+        	mergePredVal  <- merge(BLUPlist_All, envPredVal, by="gen",all=TRUE)
+		cors0[k] <- with(mergePredVal, cor(AllEnvBlup,envBlup, use="complete.obs"))
+       	} else{
+		cors0[k] <- NA
+		}
+
+} else{
+
+	modfit  <-  try(asreml(fixed=fyld~prop_hav + env,
+        	random= ~rr(env):gen +  diag(env):gen + at(env):rep,
+        	residual=~dsum(~units|env),
+        	na.action=na.method(y='include',x='include'),
+       	 	data=provdat,maxit=30,workspace = 250e6, pworkspace=250e6,trace=FALSE))
+
+	if (!inherits(modfit, what = "try-error")) {
+	
+		# extract out the predicted value from each trial and correlate with all env blups
+                PredVal <- predict(modfit, classify = "gen")$pvals
+                envPredVal <- PredVal %>% select(gen,predicted.value) %>%
+                rename(envBlup=predicted.value) %>% data.frame
+		mergePredVal  <- merge(BLUPlist_All, envPredVal, by="gen",all=TRUE)
+                cors0[k] <- with(mergePredVal, cor(AllEnvBlup,envBlup, use="complete.obs"))
+       }else{
+		cors0[k] <- NA}
+     }
+   }
+ddList[[u]] <- data.frame(r=cors0, iter=1:length(cors0), nENV=u)
+}
+
+cat("\n print ddlist","\n")
+print(ddList)
+envSamplingOutput <- do.call(rbind, ddList)
+
+  gainOutput <- envSamplingOutput %>%
+    group_by(nENV) %>%
+    summarise(
+      MEAN = mean(r, na.rm=TRUE),
+      SE = sd(r)/sqrt(iters)#quantile(r,.95)
+    )
+
+# write out the gain from sampling environment representative
+write.csv(gainOutput, file="output/fyld_env_sample_gainList.csv",row.names=FALSE)
+```
+
+
+# Representative of TPE for 3 traits
+This is a line plot showing the trend of a number of environments likely to present target population of environment (TPE) for the traits: fyld, dm, and tyld.
+Note: the output for individual traits is merged together i.e, row binds to have this plot.
+
+```{r, TPE}
+
+gainList <- read.csv(file="output/traitTPEGainList.csv", header=T)
+
+TPEplot <- ggplot(gainList,aes(x=nENV,y=MEAN, group=trait,colour=trait))+
+  geom_ribbon(aes(x=nENV,ymin=MEAN-SE,ymax=MEAN+SE),alpha=0.2,linetype=0)+
+  geom_point()+
+  geom_line(size=1)+
+  guides(alpha=FALSE)+
+  scale_x_continuous("nEnvironments", labels = seq(1,max(gainList$nENV),2), breaks = seq(1,max(gainList$nENV),2))+
+  scale_y_continuous("Breeding value accuracy compared to all_Envs", limits=c(0,1), labels = seq(0,1,.1), breaks = seq(0,1,.1)) +
+  geom_vline(xintercept=c(2,3,5,8), linetype="dashed", color = "red")
+
+print(TPEplot)
+#ggsave(paste(output_dirpath,"TPEplot",".jpeg",sep=""), plot=TPEplot,
+ #      height=5, width=10, units="in", dpi=500)
+```
+
+
+
+# Clustering testing environments based on genotypic BLUPs
+
+```{r, eval=FALSE}
+
+# fit joint analysis based of fresh root yield
+modfit  <-  asreml(fixed=fyld ~env + prop_hav,
+        random= ~ at(env):rep + gen + env:gen,
+        residual=~dsum(~units|env),
+        na.action=na.method(y='include',x='include'),
+        data=pheno,maxit=150,workspace = 250e6, trace = FALSE)
+
+
+cat("\n BLUPs by  environments","\n")
+blupByEnv <- predict(modfit, classify = "env:gen",sed=T)$pvals
+
+blupByEnv <- blupByEnv %>% dplyr::select(env,gen, predicted.value)%>%
+                rename(predVal=predicted.value) %>% spread(env,predVal)
+
+write.csv(blupByEnv, file="output/envSpecificBLUP.csv",row.names=FALSE) # write the BLUPs to a file
+```
+
+
+# Correlation among the environments based on the genotypic blups
+
+```{r,clusterEnvs}
+
+blupByEnv <- read.csv(file="output/envSpecificBLUP.csv", header=T) 
+
+# compute Pearson correlation among the environment-specific genotypic blups
+corcoef <- cor(blupByEnv[,2:length(colnames(blupByEnv))], method = "pearson", use="pairwise.complete.obs")
+
+
+# Coerce to matrix object
+corcoef <- as.matrix(corcoef) # coerce to matrix object
+
+# correlation distance matrix from correlation matrix
+dist.mat <- as.dist(1-abs(corcoef))
+
+# carry out hierarchical clustering based on the ward linkage method
+res.hc <- hclust(d=dist.mat, method="ward.D2")
+
+# plot(as.dendrogram(res.hc),ylab="Height",edgePar=list(col=3, lwd=3), cex=0.2, horiz=F) 
+# Cut the tree
+
+envplot <- fviz_dend(res.hc, cex = 0.7, k = 3, 
+ color_labels_by_k = FALSE, rect = TRUE, main="")
+
+print(envplot)
+#ggsave(paste(output_dirpath,"envClusterBLUP_fyld_dendogram",".jpeg",sep=""), plot=envplot,
+ #      height=5, width=10, units="in", dpi=500)
+```
+
