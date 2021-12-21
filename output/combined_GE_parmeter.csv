@@ -1,0 +1,26 @@
+Effect,trait,estm,percent_var
+Genotype,fyld,12.22,6.4
+Environment,fyld,108.31,56.7
+Rep(Env),fyld,4.58,2.4
+Genotype x Environment,fyld,19.69,10.31
+Residual,fyld,46.22,24.19
+Genotype,dmc,3.45,12.59
+Environment,dmc,14.94,54.52
+Rep(Env),dmc,0.73,2.68
+Genotype x Environment,dmc,3.12,11.39
+Residual,dmc,5.16,18.83
+Genotype,dyld,1.35,4.39
+Environment,dyld,19.17,62.33
+Rep(Env),dyld,0.7,2.26
+Genotype x Environment,dyld,2.97,9.66
+Residual,dyld,6.57,21.36
+Genotype,hi,0,20.92
+Environment,hi,0.01,39.43
+Rep(Env),hi,0,4.52
+Genotype x Environment,hi,0,10.15
+Residual,hi,0,24.98
+Genotype,tyld,12.11,6.94
+Environment,tyld,111.5,63.91
+Rep(Env),tyld,6.47,3.71
+Genotype x Environment,tyld,9.28,5.32
+Residual,tyld,35.09,20.11
