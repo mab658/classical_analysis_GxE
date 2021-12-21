@@ -99,7 +99,7 @@ boxplot_env_trait <- ggplot(data = narrowPhenoDat , aes(x=loc,y=y, fill=trait)) 
     facet_grid(trait~year, scales = "free")
 
 # save the plot to a file
-#ggsave("boxplot_env_trait.jpeg",height=5, width=8, units="in", dpi=300)
+ggsave("output/boxplot_env_trait.jpeg",height=5, width=8, units="in", dpi=300)
 print(boxplot_env_trait)
 
 ```
@@ -141,7 +141,7 @@ cv_vs_H2 <- ggplot(data = stats.output,
  )
 
 # save the plot to a file
-#ggsave("cv_vs_H2.jpeg",height=5, width=8, units="in", dpi=300)
+ggsave("output/cv_vs_H2.jpeg",height=5, width=8, units="in", dpi=300)
 
 # Print the heatmap
 print(cv_vs_H2)
@@ -182,9 +182,93 @@ Ac_vs_H2 <- ggplot(data = Ac_H2_output,
 
 
 # output the plot to a file
-#ggsave("Ac_vs_H2.jpeg",height=5, width=8, units="in", dpi=300)
+ggsave("output/Ac_vs_H2.jpeg",height=5, width=8, units="in", dpi=300)
 
 print(Ac_vs_H2) # output the plot
+```
+
+
+
+# Boxplot showing distribution of traits for parameter estimate
+
+Boxplot showing distribution of fresh root yield (fyld t/ha), dry matter content (dmc %), dry yield (dyld t/ha), harvest index (hi), and top yield (tyld t/ha) for derived parameters such as broad-sense heritability, coeficient of variation, experimental accuracy, and residual variance across 17 trials.
+
+```{r,boxplotParameterEstimate}
+trialSummStats <- read.csv("output/raw_pheno_trial17_summary.csv", header = T)
+
+summStats <- trialSummStats %>%
+  dplyr::select(trial,trait,H2,cv,Accr,res_var) %>%
+  gather(key = parm, value = estm, -c(trial, trait))
+
+summStats$trait <- as.factor(summStats$trait)
+summStats$parm <- as.factor(summStats$parm)
+
+# reorder level of factors
+summStats$parm <- factor(summStats$parm, levels = c("H2", "cv", "Accr","res_var"), labels=c("Broad-sense heritability","Coefficient of correlation",
+"Experimental accuracy","Residual variance"))
+
+
+summStats$trait <- factor(summStats$trait, levels = c("fyld", "dm", 
+                                                      "dyld","hi","tyld"))
+
+boxplot_trait_parm <- ggplot(data = summStats , 
+                             aes(x=trait,y=estm, fill = "grey30", 
+                                 alpha = 0.5)) +
+  geom_boxplot(stat = "boxplot",  
+                 outlier.colour = "grey30", 
+                 outlier.alpha = 0.5, 
+                 outlier.shape = 16, 
+                 outlier.size = 0.5, 
+                 na.rm=TRUE) +
+  stat_summary(fun=mean, 
+               colour="blue", 
+               geom="point", na.rm = TRUE) +
+  
+  geom_jitter(width = 0.2, 
+              color = "black", 
+              alpha = 0.5) +
+  labs(y="Parameter estimate") + 
+  theme_bw() +
+  theme(axis.title=element_text(colour="black",face="bold", size=12),
+         axis.text = element_text(size=10),
+        legend.position="none") +
+  facet_wrap(vars(parm), ncol = 4, scales="free_y")
+  
+
+ggsave("output/boxplot_trait_parm.jpeg",height=4.2, width=6.5, units="in", dpi=300)
+print(boxplot_trait_parm)
+
+```
+
+
+# Percentage of variation attributed to factors in a classical random anova model
+
+This is a plot showing the percentage of total variation attributed to environment, genotype, genotype by environment, rep nested within environment, and residual term from fitting joint random effect model
+
+```{r}
+anovaParms <- read.csv("combined_GE_parameter.csv", header = T)
+
+# coerce trait to a factor and reorder
+anovaParms$Effect <- as.factor(anovaParms$Effect)
+anovaParms$trait <- as.factor(anovaParms$trait)
+anovaParms$trait <- factor(anovaParms$trait,
+                           levels = c("fyld", "dmc","dyld","hi","tyld"),
+                           labels = c("Fresh root yield", "Dry matter content","Dry yield","Harvest index","Top yield"))
+
+                    
+anovaParmsPlot<- ggplot(data=anovaParms, aes(x=trait,y=percent_var,fill=Effect))+
+  geom_bar(position="dodge",stat="identity",color="grey30") + 
+  coord_flip() +
+  labs(y="Percentage of total variance explained") +
+  theme_bw() +
+  theme(axis.title = element_text(colour="black",face="bold", size=12),
+         plot.title = element_text(hjust = 0.5,lineheight=.5,colour="black",face="bold", size=12),
+         axis.text = element_text(face="bold", size=10), axis.text.x = element_text(angle = 0, hjust = 1))+
+  scale_fill_grey(start = 0, end = .9)
+
+anovaParmsPlot
+ggsave("output/anovaParmsPlot.jpeg",height=4.2, width=6.5, units="in", dpi=300)
+print(anovaParmsPlot)
 ```
 
 
@@ -200,16 +284,91 @@ Note: The function can be invoked to fit FW model for any trait of interest with
 # import the two-way GxE table ouput resulting from using SAS application
 two_wayGxE <- read.csv(file="output/gen_env_trait.csv", header=T)
 
-## Create a trial data TD object
-setATD <- statgenSTA::createTD(data = two_wayGxE, genotype = "gen", trial = "env")
+# Standardize the trait to mean of zero and unit variance be able to compare MSE across the traits
 
-# Invoke a defined funtion fwMpdel from source script to fit FW model
+fwScaleDat <- two_wayGxE %>%
+  mutate_at(c("dyld","fyld","hi","tyld","dm"),~(scale(.)%>% as.vector))
+
+## Create a trial data TD object
+setATD <- statgenSTA::createTD(data = fwScaleDat, genotype = "gen", trial = "env")
+
+# Invoke a defined function fwMpdel from source script to fit FW model
 source("code/fwModel.R")
 
 # Example: Invoke the defined function to fit FW model for fresh root yield (fyld)
 fwOutput <- fwModel(traitName = "fyld")
 print(fwOutput)
 ```
+
+
+# Boxplot of means square error (MSE) and slope from FW  model
+
+This Boxplot showing the distribution of the parameter estimates - slope and MSE from Finlay Wilkinson model
+
+```{r}
+fwSensMse <- read.csv(file="fwScaleTraitSens.csv", header = T)
+
+fwParmEst <- fwSensMse %>%
+  dplyr::select(genotype, trait,sens,MSdeviation) %>%
+  rename(MSE=MSdeviation)%>%
+  gather(key = parm, value = estm, -c(genotype, trait))
+
+
+# Coerce to a factor
+fwParmEst$trait <- as.factor(fwParmEst$trait)
+fwParmEst$parm <- as.factor(fwParmEst$parm)
+
+# reorder the factor levels
+fwParmEst$trait <- factor(fwParmEst$trait, levels = c("fyld", "dm", 
+                                                      "dyld","hi","tyld"))
+
+fwParmEst$parm <- factor(fwParmEst$parm, levels = c("MSE", "sens"), labels=c("Means square error","Slope"))
+
+boxplot_fwParm <- ggplot(data = fwParmEst,
+                             aes(x=trait,y=estm, fill = "grey30", 
+                                 alpha = 0.5)) +
+  geom_boxplot(stat = "boxplot",  
+                 outlier.colour = "grey30", 
+                 outlier.alpha = 0.5, 
+                 outlier.shape = 16, 
+                 outlier.size = 0.5, 
+                 na.rm=TRUE) +
+  stat_summary(fun=mean, 
+               colour="blue", 
+               geom="point", na.rm = TRUE) +
+  
+  geom_jitter(width = 0.2, 
+              color = "black", 
+              alpha = 0.5) +
+  labs(y="Parameter estimate") + 
+  theme_bw() +
+  theme(axis.title=element_text(colour="black",face="bold", size=12),
+         axis.text = element_text(size=10),
+        legend.position="none",
+        strip.text = element_text(size = 12, color = "black")) +
+  
+  facet_wrap(vars(parm), ncol = 2, scales="free_y")
+
+
+  ggsave(paste("output/boxplot_fwParm",".jpeg",sep=""),
+       plot=boxplot_fwParm,
+       height=4.2, width=6.5, units="in", dpi=300)
+  
+ print(boxplot_fwParm) 
+```
+
+
+# Summary statistics of MSE and slope
+This computes the minimum, median, maximum, and variance of means square (MSE) and slope resulting from fitting FW model for the observed traits
+
+```{r}
+fwParmEstStats <- fwParmEst %>%
+  group_by(parm,trait)%>%
+  summarise(minimum=min(estm, na.rm=T),median=median(estm, na.rm=T),
+            maximum = max(estm, na.rm=T), variance=var(estm,na.rm=T))
+write.csv(fwParmEstStats,file="output/fw_MSE_and_slope_statistics.csv",row.names = FALSE)
+```
+
 
 
 # Fitting Additive Main Effect and Multiplicative (AMMI) Model
@@ -240,10 +399,187 @@ Like other two models, the analysis was based on 17 trials after data quality co
 # Invoke a defined funtion ggeModel from source script to fit GGE model
 source("code/ggeModel.R")
 
-# Example: Invoke the defined function to fit AMMI model for fresh root yield (fyld)
+# Example: Invoke the defined function to fit GGE model for fresh root yield (fyld)
 GGEoutput <- ggeModel(traitName = "fyld")
 print(GGEoutput)
 ```
+
+
+# Percentage of variation attributed to each factor in linear-bilinear model
+
+This is a Barchart showing percentage of variation attributed to environment, genotype, genotype by environment interaction, and residual terms in FW, AMMI, and GGE models.
+
+```{r}
+modelParms <- read.csv("ammi_barGraph.csv", header = T)
+
+# coerce trait to a factor and reorder
+modelParms$trait <- as.factor(modelParms$trait)
+modelParms$trait <- factor(modelParms$trait,
+                           levels = c("fyld", "dmc","dyld","hi","tyld"),
+                           labels = c("Fresh root yield","Dry matter content",
+                                     "Dry yield",  "Harvest index","Top yield"))
+
+modelParmsPlot <- ggplot(data=modelParms, aes(x=trait,y=TSS,fill=factor(Model))) +
+  geom_bar(position="dodge",stat="identity") + 
+  coord_flip() +
+  labs(y="Percentage of total variation explained", fill="Model") +
+  theme_bw() +
+  theme(axis.title = element_text(colour="black",face="bold", size=12),
+         plot.title = element_text(hjust = 0.5,lineheight=.5,colour="black",face="bold", size=12),
+         axis.text = element_text(face="bold", size=8), axis.text.x = element_text(angle = 0, hjust = 1))+
+  scale_fill_grey(start = 0, end = .9)+
+  facet_grid(.~source, scales = "free") + theme(strip.text = element_text(
+    size = 7,face = "bold", color = "black"))
+print(modelParmsPlot)
+
+ggsave("output/parmEstimatePlot.jpeg",height=4.2, width=6.5, units="in", dpi=300)
+```
+
+
+
+# Compute univariate stability statistic (Cultivar superiority index)
+
+This section assesses the consistency of genotype stability performance by exploring
+Cultivar superiority index as as univariate stability statistics.
+
+```{r,univariateStabilityMeasure}
+# Create a trial data TD object from two-way data structure.
+setATD <- statgenSTA::createTD(data = two_wayGxE, genotype = "gen", trial = "env")
+
+# compute Cultivar-superiority measure for fyld
+
+fyldgeStab <- gxeStability(TD = setATD, trait = "fyld")
+
+# extract coefficient of stability value
+fyldSupIndex <- fyldgeStab$superiority
+colnames(fyldSupIndex)[2:3] <- c("fyld","fyld_SupIndexValue")
+
+
+# compute Cultivar-superiority measure for dm
+dmgeStab <- gxeStability(TD = setATD, trait = "dm")
+
+# extract coefficient of stability value
+dmSupIndex <- dmgeStab$superiority
+colnames(dmSupIndex)[2:3] <- c("dm","dm_SupIndexValue")
+
+
+### compute Cultivar-superiority measure for dyld
+dyldgeStab <- gxeStability(TD = setATD, trait = "dyld")
+
+# extract coefficient of stability value
+dyldSupIndex <- dyldgeStab$superiority
+colnames(dyldSupIndex)[2:3] <- c("dyld","dyld_SupIndexValue")
+
+# Merge the computed stability index
+genStab <- merge(fyldSupIndex, dmSupIndex) %>%
+              merge(dyldSupIndex)
+
+
+# rank ascending order of superiority index for fyld, dm, and dyld
+  genStab <- arrange(genStab,fyld_SupIndexValue) %>%
+    mutate(fyld_rank=1:nrow(genStab))
+
+  genStab <- arrange(genStab,dm_SupIndexValue) %>%
+    mutate(dm_rank=1:nrow(genStab))
+
+  genStab <- arrange(genStab,dyld_SupIndexValue) %>%
+    mutate(dyld_rank=1:nrow(genStab)) 
+
+
+genStab <-  genStab %>%
+    select(genotype, fyld, fyld_SupIndexValue, fyld_rank,
+           dm, dm_SupIndexValue, dm_rank,
+           dyld, dyld_SupIndexValue, dyld_rank)
+
+# print out the result of univariate stability measures
+  print(genStab)
+
+# write the output of univariate stability statistics to a file  
+write.csv(genStab, file="output/cultivarStabilityIndexOutput.csv",row.names=FALSE) 
+```
+
+
+
+# scatter plot of cultivar superiority index versus meam of traits
+This plot revealed how cultivar superiority index is related to mean of fresh root, dry matter content and dry yield towards identofying high yielding and stable genotypes
+
+```{r,cultivarSupIndexPlot}
+fyldCultIndex <- ggplot(data = genStab,
+       aes(x = fyld,
+           y = fyld_SupIndexValue)) + 
+  geom_point(color = ifelse(genStab$fyld_SupIndexValue < 82.0, "#E41A1C", "#4DAF4A"),size = 1.7,
+             alpha = 0.5) +
+  scale_color_brewer(palette = "Set1") +
+  geom_text_repel(aes(x = fyld,
+                      y =fyld_SupIndexValue ,
+                      label = genotype),
+                  max.overlaps=20,
+                  size = 2.5, segment.colour = NA) +
+  labs(x = "Mean fresh root yield (t/ha)",
+       y = "Cultivar superiority index") +
+ theme_bw() +
+  theme(axis.title.x = element_text(size = 10, face = "bold"),
+        axis.title.y = element_text(size = 10, face = "bold"))
+
+# save the plot to a file
+#ggsave("fyldCultIndex.jpeg",height=5, width=8, units="in", dpi=300)
+
+# Print the heatmap
+print(fyldCultIndex)
+
+
+### dry matter content
+
+dmCultIndex <- ggplot(data = genStab,
+       aes(x = dm,
+           y = dm_SupIndexValue)) + 
+  geom_point(color = ifelse(genStab$dm_SupIndexValue < 6.5, "#E41A1C", "#4DAF4A"),size = 1.7,
+             alpha = 0.5) +
+  scale_color_brewer(palette = "Set1") +
+  geom_text_repel(aes(x = dm,
+                      y =dm_SupIndexValue ,
+                      label = genotype),
+                  max.overlaps=35,
+                  size = 2.5, segment.colour = NA) +
+  labs(x = "Mean dry matter content (%)",
+       y = "Cultivar superiority index") +
+ theme_bw() +
+  theme(axis.title.x = element_text(size = 10, face = "bold"),
+        axis.title.y = element_text(size = 10, face = "bold"))
+
+# save the plot to a file
+#ggsave("dmCultIndex.jpeg",height=5, width=8, units="in", dpi=300)
+
+# Print the heatmap
+print(dmCultIndex)
+
+
+### dry yield
+  
+  dyldCultIndex <- ggplot(data = genStab,
+       aes(x = dyld,
+           y = dyld_SupIndexValue)) + 
+  geom_point(color = ifelse(genStab$dyld_SupIndexValue < 9.5, "#E41A1C", "#4DAF4A"),size = 1.7,
+             alpha = 0.5) +
+  scale_color_brewer(palette = "Set1") +
+  geom_text_repel(aes(x = dyld,
+                      y =dyld_SupIndexValue ,
+                      label = genotype),
+                  max.overlaps=40,
+                  size = 2.5, segment.colour = NA) +
+  labs(x = "Mean dry yield (t/ha)",
+       y = "Cultivar superiority index") +
+ theme_bw() +
+  theme(axis.title.x = element_text(size = 10, face = "bold"),
+        axis.title.y = element_text(size = 10, face = "bold"))
+  
+# save the plot to a file
+ggsave("output/dyldCultIndex.jpeg",height=5, width=8, units="in", dpi=300)
+
+# Print the heatmap
+print(dyldCultIndex)  
+```
+
 
 
 # Representative of target population of environment(TPE) for fresh yield
@@ -426,9 +762,9 @@ TPEplot <- ggplot(gainList,aes(x=nENV,y=MEAN, group=trait,colour=trait))+
   scale_y_continuous("Breeding value accuracy compared to all_Envs", limits=c(0,1), labels = seq(0,1,.1), breaks = seq(0,1,.1)) +
   geom_vline(xintercept=c(2,3,5,8), linetype="dashed", color = "red")
 
+
+ggsave("output/TPEplot.jpeg",height=4.2, width=6.5, units="in", dpi=300)
 print(TPEplot)
-#ggsave(paste(output_dirpath,"TPEplot",".jpeg",sep=""), plot=TPEplot,
- #      height=5, width=10, units="in", dpi=500)
 ```
 
 
@@ -458,8 +794,8 @@ write.csv(blupByEnv, file="output/envSpecificBLUP.csv",row.names=FALSE) # write 
 # Correlation among the environments based on the genotypic blups
 
 ```{r,clusterEnvs}
-
-blupByEnv <- read.csv(file="output/envSpecificBLUP.csv", header=T) 
+setwd("/Users/mab658/Documents/research_project/classical_analysis_GxE")
+blupByEnv <- read.csv(file="../output/tyldenvSpecificBLUP.csv", header=T) 
 
 # compute Pearson correlation among the environment-specific genotypic blups
 corcoef <- cor(blupByEnv[,2:length(colnames(blupByEnv))], method = "pearson", use="pairwise.complete.obs")
@@ -477,11 +813,10 @@ res.hc <- hclust(d=dist.mat, method="ward.D2")
 # plot(as.dendrogram(res.hc),ylab="Height",edgePar=list(col=3, lwd=3), cex=0.2, horiz=F) 
 # Cut the tree
 
-envplot <- fviz_dend(res.hc, cex = 0.7, k = 3, 
- color_labels_by_k = FALSE, rect = TRUE, main="")
+envplot <- fviz_dend(res.hc, cex = 0.6, k = 5, 
+ color_labels_by_k = FALSE,  main="")
 
 print(envplot)
-#ggsave(paste(output_dirpath,"envClusterBLUP_fyld_dendogram",".jpeg",sep=""), plot=envplot,
- #      height=5, width=10, units="in", dpi=500)
+ggsave("../output/envClusterBLUP_tyld_dendogram.jpeg",height=5, width=10, units="in", dpi=300)
 ```
 
