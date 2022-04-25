@@ -188,6 +188,44 @@ print(Ac_vs_H2) # output the plot
 ```
 
 
+# A line graph showing the average minimum and maximum temperature, total precipitation, and average relative humidity across the 20 testing environments.
+
+```{r}
+weatherDat <- read.csv(file = "data/weatherData.csv", header=TRUE)
+
+weather <- weatherDat %>%
+  group_by(ENV,AGROZONE) %>%
+  dplyr::summarize(TMIN=mean(TMIN, na.rm=TRUE),
+                   TMAX=mean(TMAX, na.rm=TRUE),
+                   PRECIPITATION = sum(PRECIPITATION, na.rm = TRUE),
+                   RHMEAN = mean(RHMEAN, na.rm=TRUE))%>%
+  gather(key = parameter, value = y, -c(ENV,AGROZONE)) %>%
+  mutate(parameter=as.factor(parameter))
+
+weather$parameter <- factor(weather$parameter, levels = c("TMIN",
+                                                          "TMAX",
+                                                          "PRECIPITATION","RHMEAN"), 
+                  labels = c("Min Temp (Cel.)",
+                             "Max Temp (Cel.)",
+                             "Precipitation (mm)", "Mean RH (%)"))
+
+weatherPlot <- ggplot(data=weather,aes(x=ENV,y=y,group=1, color=AGROZONE))+geom_line()+geom_point()+
+  labs(x="Environment", y="Estimates") +
+  theme_bw() +
+  theme(axis.title=element_text(colour="black",face="bold", size=12),
+        axis.text = element_text(size=7),
+        axis.text.x = element_text(angle = 90, size=10,hjust = 1),
+        axis.text.y = element_text(size=10),
+        strip.text = element_text(size = 6, color = "black",lineheight=5.0))+
+  guides(col=guide_legend("Agro-ecological zones"))+
+  facet_grid(rows=vars(parameter),scales = "free")
+
+# output the plot to a file
+ggsave("weatherPlot.jpeg",height=4.2, width=6.5, units="in", dpi=300)
+print(weatherPlot)
+```
+
+
 
 # Boxplot showing distribution of traits for parameter estimate
 
