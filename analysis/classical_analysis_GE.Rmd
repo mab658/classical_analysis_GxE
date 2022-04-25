@@ -209,7 +209,7 @@ weather$parameter <- factor(weather$parameter, levels = c("TMIN",
                              "Max Temp (Cel.)",
                              "Precipitation (mm)", "Mean RH (%)"))
 
-weatherPlot <- ggplot(data=weather,aes(x=ENV,y=y,group=1, color=AGROZONE))+geom_line()+geom_point()+
+weatherDataPlot <- ggplot(data=weather,aes(x=ENV,y=y,group=1, color=AGROZONE))+geom_line()+geom_point()+
   labs(x="Environment", y="Estimates") +
   theme_bw() +
   theme(axis.title=element_text(colour="black",face="bold", size=12),
@@ -221,8 +221,8 @@ weatherPlot <- ggplot(data=weather,aes(x=ENV,y=y,group=1, color=AGROZONE))+geom_
   facet_grid(rows=vars(parameter),scales = "free")
 
 # output the plot to a file
-ggsave("weatherPlot.jpeg",height=4.2, width=6.5, units="in", dpi=300)
-print(weatherPlot)
+ggsave("output/weatherDataPlot.jpeg",height=4.2, width=6.5, units="in", dpi=300)
+print(weatherDataPlot)
 ```
 
 
